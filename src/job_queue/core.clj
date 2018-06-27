@@ -4,8 +4,15 @@
 (defn read-json-content []
   (json/read (java.io.BufferedReader. (java.io.InputStreamReader. System/in))))
 
+(defn process-content
+  [job-data]
+  (loop [job-data job-data]
+    (when-not (empty? job-data)
+      (println (first job-data))
+      (recur (rest job-data)))))
+
 (defn -main [& args]
-  (println "IMPORT JOBS...")
+  (println "\n\nIMPORT JOBS...")
   (let [content (read-json-content)]
-    (println "teste: " content))
-    (recur :continue))
+    (process-content content)
+    (recur :continue)))
