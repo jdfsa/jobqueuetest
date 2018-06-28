@@ -17,17 +17,21 @@
 (defn get-agent-by-id [agents id]
   (into {} (filter #(= (% :id) id) agents)))
 
-(defn get-job-by-type [jobs job-type]
-  (if (nil? job-type)
-    nil
-    (into {} (filter #(= (% :type) job-type)))))
+(defn get-available-job-by-types [jobs types]
+  (loop [jobs jobs, types types]
+    (if (empty? types)
+      nil
+      (do 
+        (def job (first (filter #(= (% :type) (first types)) jobs)))
+        (if-not (nil? job)
+          job
+          (recur jobs (rest types)))))))
 
 (defn process-job-request [job-request]
   (def agent-id (job-request :agent_id))
   (def agent (get-agent-by-id @agents-repository agent-id))
-  ; (def job (get-job-by-type @jobs-repository))
-  ; (println (first (agent :primary_skillset)))
-  ; (println (first (agent :secondary_skillset)))
+  (def job (get-available-job-by-types @jobs-repository (concat (agent :primary_skillset) (agent :secondary_skillset))))
+  (println job)
   )
 
 (defn process-content
@@ -51,5 +55,4 @@
   (println "\n\nIMPORT QUEUE...")
   (let [content (read-json-content)]
       (process-content content))
-      (println @agents-repository)
   (recur :continue))
