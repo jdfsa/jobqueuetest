@@ -12,6 +12,8 @@
 
 (defn push [repository item] (dosync (alter repository conj item)))
 
+(defn erase [repository] (dosync (ref-set repository #{})))
+
 (defn register-job-request [job agent] 
   (let [job-id (job :id) 
         agent-id (agent :id)
@@ -74,6 +76,9 @@
 (defn -main [& args]
   (println "\n\nINPUT QUEUE...")
   (let [content (read-json-content)]
+      (erase agents-repository)
+      (erase jobs-repository)
+      (erase job-requests-repository)
       (process-content content)
       
       (println "\nOUTPUT QUEUE:")
