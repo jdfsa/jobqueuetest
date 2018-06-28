@@ -22,7 +22,7 @@
           }
         }]
     (dosync 
-      (alter job-requests-repository conj job-request)
+      (alter job-requests-repository concat job-request)
       (ref-set agents-repository (into #{} (remove #(= (% :id) agent-id) @agents-repository)))
       (ref-set jobs-repository (into #{} (remove #(= (% :id) job-id) @jobs-repository)))
     )))
@@ -72,8 +72,13 @@
         (recur (rest job-data))))))
 
 (defn -main [& args]
-  (println "\n\nIMPORT QUEUE...")
+  (println "\n\nINPUT QUEUE...")
   (let [content (read-json-content)]
       (process-content content)
-      (println (cheshire/encode @job-requests-repository)))
+      
+      (println "\nOUTPUT QUEUE:")
+      (println (cheshire/encode @job-requests-repository))
+      ; (println "available agents: " @agents-repository)
+      ; (println "pending jobs: " @jobs-repository)
+      )
   (recur :continue))
