@@ -15,12 +15,13 @@
   (dosync (alter repository conj item)))
 
 (defn get-item-by-id [items id]
-  (filter (fn [item] (= (item :id) id)) items))
+  (into {} (filter (fn [item] (= (item :id) id)) items)))
 
 (defn process-job-request [job-request]
   (def agent-id (job-request :agent_id))
   (def agent (get-item-by-id @agents-repository agent-id))
-  (println agent)
+  (println (agent :primary_skillset))
+  (println (agent :secondary_skillset))
   )
 
 (defn process-content
