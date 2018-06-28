@@ -7,21 +7,27 @@
     (fn [k] (keyword k)))
 )
 
-(def agents-repository (ref []))
-(def jobs-repository (ref []))
-(def job-requests-repository (ref []))
+(def agents-repository (ref #{}))
+(def jobs-repository (ref #{}))
+(def job-requests-repository (ref {}))
 
 (defn push [repository item]
   (dosync (alter repository conj item)))
 
-(defn get-item-by-id [items id]
-  (into {} (filter (fn [item] (= (item :id) id)) items)))
+(defn get-agent-by-id [agents id]
+  (into {} (filter #(= (% :id) id) agents)))
+
+(defn get-job-by-type [jobs job-type]
+  (if (nil? job-type)
+    nil
+    (into {} (filter #(= (% :type) job-type)))))
 
 (defn process-job-request [job-request]
   (def agent-id (job-request :agent_id))
-  (def agent (get-item-by-id @agents-repository agent-id))
-  (println (agent :primary_skillset))
-  (println (agent :secondary_skillset))
+  (def agent (get-agent-by-id @agents-repository agent-id))
+  ; (def job (get-job-by-type @jobs-repository))
+  ; (println (first (agent :primary_skillset)))
+  ; (println (first (agent :secondary_skillset)))
   )
 
 (defn process-content
@@ -42,7 +48,8 @@
         (recur (rest job-data))))))
 
 (defn -main [& args]
-  (println "\n\nIMPORT JOBS...")
+  (println "\n\nIMPORT QUEUE...")
   (let [content (read-json-content)]
-    (process-content content)
-    (recur :continue)))
+      (process-content content))
+      (println @agents-repository)
+  (recur :continue))
