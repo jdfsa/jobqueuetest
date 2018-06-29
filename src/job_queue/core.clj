@@ -58,11 +58,10 @@
   (register-job-request job agent))
 
 (defn process-content [job-data]
-    
-  (loop [job-data job-data]
-    (let [item (first job-data)]      
-      (when-not (empty? job-data)
-        
+  (loop [[item & items] job-data]
+    (if (nil? item)
+      nil?
+      (do
         (def new-agent (item :new_agent))
         (def new-job (item :new_job))
         (def job-request (item :job_request))
@@ -71,7 +70,7 @@
         (when-not (nil? new-job) (push jobs-repository new-job) :new-job)
         (when-not (nil? job-request) (process-job-request job-request))
         
-        (recur (rest job-data))))))
+        (recur items)))))
 
 (defn -main [& args]
   (println "\n\nINPUT QUEUE...")
