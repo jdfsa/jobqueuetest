@@ -10,7 +10,6 @@
 (def jobs-repository (ref ()))
 (def job-requests-repository (ref []))
 
-(defn push [repository item] (dosync (alter repository concat item)))
 (defn set-data [repository content] (dosync (ref-set repository content)))
 (defn erase [repository] (dosync (ref-set repository #{})))
 
@@ -59,8 +58,6 @@
   (register-job-request job agent))
 
 (defn process-content [job-data]
-  (erase agents-repository)
-  (erase jobs-repository)
   (erase job-requests-repository)
   
   (Thread/sleep 500)
