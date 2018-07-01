@@ -8,7 +8,6 @@
 
 (def agents-repository (ref []))
 (def jobs-repository (ref ()))
-(def job-requests-repository (ref []))
 
 (defn set-data [repository content] (dosync (ref-set repository content)))
 (defn erase [repository] (dosync (ref-set repository #{})))
@@ -23,10 +22,9 @@
           }
         }]
     (dosync 
-      (alter job-requests-repository concat job-request)
       (ref-set agents-repository (into [] (remove #(= (% :id) agent-id) @agents-repository)))
-      (ref-set jobs-repository (into [] (remove #(= (% :id) job-id) @jobs-repository)))
-    )))
+      (ref-set jobs-repository (into [] (remove #(= (% :id) job-id) @jobs-repository))))
+    job-request))
 
 (defn get-agent-by-id [agents id]
   (some #(and (= (% :id) id) %) agents))
@@ -58,26 +56,21 @@
   (register-job-request job agent))
 
 (defn process-content [job-data]
-  (erase job-requests-repository)
-  
   (Thread/sleep 500)
   (set-data agents-repository (into [] (map #(:new_agent %) (filter #(:new_agent %) job-data))))
   (set-data jobs-repository (into [] (map #(:new_job %) (filter #(:new_job %) job-data))))
-  (loop [[job-request & requests] (map #(:job_request %) (filter #(:job_request %) job-data))]
-    (if (nil? job-request)
-      nil
-      (do
-        (process-job-request job-request)
-        (recur requests)))))
+  (loop [[job-request & requests] (map #(:job_request %) (filter #(:job_request %) job-data))
+        processed-jobs []]
+    (if (nil? job-request) 
+      processed-jobs
+      (recur requests (conj processed-jobs (process-job-request job-request))))))
 
 (defn -main [& args]
   (println "\n\nINPUT QUEUE...")
   (let [content (read-json-content)]
-      (process-content content)
+      (def processed (process-content content))
       
       (println "\nOUTPUT QUEUE:")
-      (println (cheshire/encode @job-requests-repository))
-      ; (println "available agents: " @agents-repository)
-      ; (println "pending jobs: " @jobs-repository)
-      )
+      (println (cheshire/encode processed))
+  )
   (recur :continue))
