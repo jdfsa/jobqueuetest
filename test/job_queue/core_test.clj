@@ -2,12 +2,16 @@
   (:require [clojure.test :refer :all]
             [cheshire.core :as cheshire]
             [clojure.java.io :as io]
+            [job-queue.repository :refer :all]
             [job-queue.core :as core]))
+
+(def agent-store core/agent-store)
+(def job-store core/job-store)
 
 ; fixture to garantee no repository content
 (use-fixtures :each (fn [f]
-  (core/erase core/agents-repository)
-  (core/erase core/jobs-repository)
+  (set-data agent-store [])
+  (set-data job-store [])
   (f)))
 
 ; helper function to read json data
@@ -45,7 +49,8 @@
             :primary_skillset ["rewards-question"],
             :secondary_skillset ["bills-questions"]
           }]
-      (is (= (core/get-agent-by-id input "ed0e23ef-6c2b-430c-9b90-cd4f1ff74c88") expected)))))
+      (set-data core/agent-store input)
+      (is (= (core/get-agent-by-id "ed0e23ef-6c2b-430c-9b90-cd4f1ff74c88") expected)))))
 
 (deftest test-input-1
   (testing "Should pass test input 1"
@@ -71,3 +76,11 @@
           expected (into [] (read-json "expected-output-4.json"))]
       (is (= actual expected)))))
 
+(deftest test-duplicated-data
+  (testing "There should not be duplicated data in the repositories"
+    (let [json-data (read-json "expected-input-duplicates.json")
+          actual-agents (core/store-agents json-data)
+          actual-jobs (core/store-jobs json-data)]
+      (is (and
+        (= (count actual-agents) 1)
+        (= (count actual-jobs) 2))))))

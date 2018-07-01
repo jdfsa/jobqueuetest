@@ -1,11 +1,9 @@
 (ns job-queue.core
-  (:require [cheshire.core :as cheshire]))
+  (:require [cheshire.core :as cheshire]
+            [job-queue.repository :refer :all]))
 
-(def agents-repository (ref #{}))
-(def jobs-repository (ref #{}))
-(defn set-data [repository content] (dosync (ref-set repository content)))
-(defn push-data [repository content] (dosync (alter repository into content)))
-(defn erase [repository] (dosync (ref-set repository [])))
+(def agent-store (->AppStore (ref #{})))
+(def job-store (->AppStore (ref #{})))
 
 (defn read-json-content 
   "Read a json content passed via STDIN using the cheshire library"
@@ -20,8 +18,8 @@
   by removing them from the respective available lists."
   [agent-id job-id]
   (dosync 
-    (ref-set agents-repository (into [] (remove #(= (% :id) agent-id) @agents-repository)))
-    (ref-set jobs-repository (into [] (remove #(= (% :id) job-id) @jobs-repository))))
+    (remove-data agent-store #(= (% :id) agent-id))
+    (remove-data job-store #(= (% :id) job-id)))
   true)
 
 
@@ -37,15 +35,15 @@
 
 
 (defn get-agent-by-id 
-  "Gets an agent by its `id` given an `agents` collection"
-  [agents id]
-  (some #(and (= (% :id) id) %) agents))
+  "Gets an agent by its `id`"
+  [id]
+  (get-some agent-store #(and (= (% :id) id) %)))
 
 
 (defn get-available-job 
   "Gets an available job in a specific `jobs` collection given the `types`"
   [jobs types]
-  (if (empty? types)
+  (if (or (empty? types) (empty? jobs))
     nil
     (let [job (first (filter #(= (% :type) (first types)) jobs))]
       (if-not (nil? job)
@@ -58,34 +56,49 @@
   [request]
 
   ; get the agent by id
-  (def request-value (:agent_id request))
-  (def agent (get-agent-by-id @agents-repository request-value))
+  (def agent-id (:agent_id request))
+  (def agent (get-agent-by-id agent-id))
 
-  ; gather the agent's primary and secondary skillset
-  (def primary_skillset (:primary_skillset agent))
-  (def secondary_skillset (:primary_skillset agent))
-  
-  ; gather urgent and lower priority jobs from the repository
-  (def urgent-jobs (filter #(= (% :urgent) true) @jobs-repository))
-  (def minor-jobs (filter #(= (% :urgent) false) @jobs-repository))
+  ; check whether an agent was returned
+  (if (nil? agent)
+    nil
+    (do
+      ; gather the agent's primary and secondary skillset
+      (def primary_skillset (:primary_skillset agent))
+      (def secondary_skillset (:primary_skillset agent))
+      
+      ; gather urgent and lower priority jobs from the repository
+      (def urgent-jobs (get-data job-store #(= (% :urgent) true)))
+      (def minor-jobs (get-data job-store #(= (% :urgent) false)))
 
-  ; seek for an urgent and lower priority available job
-  (def urgent-job (get-available-job urgent-jobs (concat (agent :primary_skillset) (agent :secondary_skillset))))
-  (def minor-job (get-available-job minor-jobs (concat (agent :primary_skillset) (agent :secondary_skillset))))
-  
-  ; there is an urgent job? take it! otherwise take a lower priority one
-  (def job (if-not (nil? urgent-job) urgent-job minor-job))
+      ; seek for an urgent and lower priority available job
+      (def urgent-job (get-available-job urgent-jobs (concat (agent :primary_skillset) (agent :secondary_skillset))))
+      (def minor-job (get-available-job minor-jobs (concat (agent :primary_skillset) (agent :secondary_skillset))))
+      
+      ; there is an urgent job? take it! otherwise take a lower priority one
+      (def job (if-not (nil? urgent-job) urgent-job minor-job))
 
-  ; get the agent and job ids
-  (def agent-id (:id agent))
-  (def job-id (:id job))
-  
-  ; alocate an agent to a job
-  (alocate-agent-job agent-id job-id)
+      ; get the job id
+      (def job-id (:id job))
+      
+      ; alocate an agent to a job
+      (alocate-agent-job agent-id job-id)
 
-  ; returns a formatted job request
-  (get-job-request agent-id job-id))
+      ; returns a formatted job request
+      (get-job-request agent-id job-id))))
 
+
+(defn store-agents
+  "Stores all agents specified in `content` in the agent store"
+  [content]
+  (push-data agent-store (distinct (map #(:new_agent %) (filter #(:new_agent %) content))))
+  (get-data agent-store))
+
+(defn store-jobs
+  "Stores all agents specified in `content` in the job store"
+  [content]
+  (push-data job-store (distinct (map #(:new_job %) (filter #(:new_job %) content))))
+  (get-data job-store))
 
 (defn process-content 
   "Process the `content` parsed from a json."
@@ -95,8 +108,8 @@
   (Thread/sleep 500)
 
   ; gathers and registers the agents and jobs passed in the queue message
-  (push-data agents-repository (into [] (map #(:new_agent %) (filter #(:new_agent %) content))))
-  (push-data jobs-repository (into [] (map #(:new_job %) (filter #(:new_job %) content))))
+  (store-agents content)
+  (store-jobs content)
 
   ; loop over job requests
   (loop [[job-request & requests] (map #(:job_request %) (filter #(:job_request %) content))
