@@ -4,7 +4,16 @@
             [clojure.java.io :as io]
             [job-queue.core :as core]))
 
-(defn read-json [filename]
+; fixture to garantee no repository content
+(use-fixtures :each (fn [f]
+  (core/erase core/agents-repository)
+  (core/erase core/jobs-repository)
+  (f)))
+
+; helper function to read json data
+(defn read-json 
+  "Read a json content from a `filename`"
+  [filename]
   (cheshire/parse-stream
     (clojure.java.io/reader (io/resource filename))
     (fn [k] (keyword k))))
@@ -59,5 +68,6 @@
 (deftest test-input-4
   (testing "Should pass test input 4"
     (let [actual (core/process-content (read-json "expected-input-4.json"))
-          expected (read-json "expected-output-4.json")]
+          expected (into [] (read-json "expected-output-4.json"))]
       (is (= actual expected)))))
+

@@ -2,9 +2,10 @@
   (:require [cheshire.core :as cheshire]))
 
 (def agents-repository (ref []))
-(def jobs-repository (ref ()))
+(def jobs-repository (ref []))
 (defn set-data [repository content] (dosync (ref-set repository content)))
-(defn erase [repository] (dosync (ref-set repository #{})))
+(defn push-data [repository content] (dosync (alter repository into content)))
+(defn erase [repository] (dosync (ref-set repository [])))
 
 (defn read-json-content 
   "Read a json content passed via STDIN using the cheshire library"
@@ -12,6 +13,7 @@
   (cheshire/parse-stream 
     (java.io.BufferedReader. (java.io.InputStreamReader. System/in))
     (fn [k] (keyword k))))
+
 
 (defn alocate-agent-job
   "Marks an agent and a job through their ids as alocated to a job request 
@@ -21,6 +23,7 @@
     (ref-set agents-repository (into [] (remove #(= (% :id) agent-id) @agents-repository)))
     (ref-set jobs-repository (into [] (remove #(= (% :id) job-id) @jobs-repository))))
   true)
+
 
 (defn get-job-request
   "Gets a formatted job request by taking a `job` and an `agent`."
@@ -32,19 +35,23 @@
     } 
   })
 
+
 (defn get-agent-by-id 
   "Gets an agent by its `id` given an `agents` collection"
   [agents id]
   (some #(and (= (% :id) id) %) agents))
 
-(defn get-available-job [jobs types]
+
+(defn get-available-job 
+  "Gets an available job in a specific `jobs` collection given the `types`"
+  [jobs types]
   (if (empty? types)
     nil
-    (do 
-      (def job (first (filter #(= (% :type) (first types)) jobs)))
+    (let [job (first (filter #(= (% :type) (first types)) jobs))]
       (if-not (nil? job)
         job
         (recur jobs (rest types))))))
+
 
 (defn process-job-request
   "Process a job `request` by allocating an agent to a job"
@@ -79,6 +86,7 @@
   ; returns a formatted job request
   (get-job-request agent-id job-id))
 
+
 (defn process-content 
   "Process the `content` parsed from a json."
   [content]
@@ -87,8 +95,8 @@
   (Thread/sleep 500)
 
   ; gathers and registers the agents and jobs passed in the queue message
-  (set-data agents-repository (into [] (map #(:new_agent %) (filter #(:new_agent %) content))))
-  (set-data jobs-repository (into [] (map #(:new_job %) (filter #(:new_job %) content))))
+  (push-data agents-repository (into [] (map #(:new_agent %) (filter #(:new_agent %) content))))
+  (push-data jobs-repository (into [] (map #(:new_job %) (filter #(:new_job %) content))))
 
   ; loop over job requests
   (loop [[job-request & requests] (map #(:job_request %) (filter #(:job_request %) content))
@@ -96,6 +104,7 @@
     (if (nil? job-request) 
       processed-jobs
       (recur requests (conj processed-jobs (process-job-request job-request))))))
+
 
 (defn -main
   "Main function thread"
