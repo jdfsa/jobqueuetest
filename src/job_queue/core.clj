@@ -122,10 +122,10 @@
 (defn -main
   "Main function thread"
   [& args]
-  (println "\n\nINPUT QUEUE...")
+  (println "\n\nInserts or paste the content to be processed:")
   (let [content (read-json-content)
         processed (process-content content)]
       
-      (println "\nOUTPUT QUEUE:")
+      (println "\n\nOutput message:")
       (println (cheshire/encode processed)))
   (recur :take-next-read))
