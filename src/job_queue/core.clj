@@ -122,7 +122,7 @@
 (defn -main
   "Main function thread"
   [& args]
-  (println "\n\nInserts or paste the content to be processed:")
+  (println "\n\nInsert or paste the content to be processed:")
   (let [content (read-json-content)
         processed (process-content content)]
       
