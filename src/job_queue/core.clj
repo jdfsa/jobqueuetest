@@ -1,8 +1,8 @@
 (ns job-queue.core
   (:require [cheshire.core :as cheshire]))
 
-(def agents-repository (ref []))
-(def jobs-repository (ref []))
+(def agents-repository (ref #{}))
+(def jobs-repository (ref #{}))
 (defn set-data [repository content] (dosync (ref-set repository content)))
 (defn push-data [repository content] (dosync (alter repository into content)))
 (defn erase [repository] (dosync (ref-set repository [])))
